@@ -75,7 +75,7 @@
   </div>
 
   <script>
-    const scriptUrl = "YOUR_SCRIPT_URL_HERE"; // Replace with your deployed script URL
+    const scriptUrl = "https://script.google.com/macros/s/AKfycbzKUr8RX_Q9e2iZBENMyIaOQ6lT84icRt8bHMLDZNO0n7lk_oINJJV8cxYmP__7wivfmg/exec"; // Replace with your deployed script URL
     let allItems = [];  // Will store all items from the sheet
     let selectedSKU = null;
 
@@ -150,4 +150,24 @@
 
       try {
         await fetch(scriptUrl, {
-          method
+          method: "POST",
+          mode: "no-cors", // use no-cors if you don't need to inspect the returned response
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sku: selectedSKU, email, url }),
+        });
+
+        alert("Data submitted successfully!");
+        // Optionally, refresh your dropdown data after submit
+        loadItems();
+        // Hide the form
+        document.getElementById("emailForm").style.display = "none";
+      } catch (error) {
+        console.error("Submission failed:", error);
+        alert("Submission failed. Check your console for details.");
+      }
+    };
+
+    loadItems();
+  </script>
+</body>
+</html>
