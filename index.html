@@ -37,12 +37,13 @@
 
   <h1>Select an Image & Enter Your Email</h1>
   <div id="items"></div>
-
   <div id="emailForm">
-    <h3>Enter your email for selected item:</h3>
-    <input type="email" id="emailInput" placeholder="Your email..." required />
+    <h3>Enter your email(s) and URL(s):</h3>
+    <input type="text" id="emailInput" placeholder="Email(s), comma-separated..." required />
+    <input type="text" id="urlInput" placeholder="URL(s), comma-separated..." />
     <button id="submitBtn">Submit</button>
   </div>
+  
 
   <script>
     const scriptUrl = 'https://script.google.com/macros/s/AKfycbz88WgBGcmW_zvDMO7mfuaz0jx4YiaIOGXtsq3U96AHtXX1Nrz6fOK1IEzTdzvVn0Kg6A/exec';
@@ -80,30 +81,35 @@
     }
 
     document.getElementById("submitBtn").onclick = async () => {
-      const email = document.getElementById("emailInput").value;
-      if (!selectedSKU || !email) {
-        alert("Please select an item and enter your email.");
-        return;
-      }
+  const email = document.getElementById("emailInput").value.trim();
+  const url = document.getElementById("urlInput").value.trim();
 
-      try {
-        await fetch(scriptUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({ sku: selectedSKU, email }),
-        });
+  if (!selectedSKU || !email) {
+    alert("Please select an item and enter at least one email.");
+    return;
+  }
 
-        alert("Email submitted successfully!");
-        document.getElementById("emailForm").style.display = "none";
-        document.getElementById("emailInput").value = "";
-        document.querySelectorAll('.card').forEach(c => c.classList.remove("selected"));
-      } catch (err) {
-        console.error("Failed to submit email:", err);
-        alert("There was a problem submitting your email.");
-      }
-    };
+  try {
+    await fetch(scriptUrl, {
+      method: "POST",
+      mode: "no-cors", // For local dev only
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ sku: selectedSKU, email, url }),
+    });
+
+    alert("Submitted successfully!");
+    document.getElementById("emailForm").style.display = "none";
+    document.getElementById("emailInput").value = "";
+    document.getElementById("urlInput").value = "";
+    document.querySelectorAll('.card').forEach(c => c.classList.remove("selected"));
+  } catch (err) {
+    console.error("Failed to submit:", err);
+    alert("There was a problem submitting your info.");
+  }
+};
+
 
     loadItems();
   </script>
