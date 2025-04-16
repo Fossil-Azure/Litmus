@@ -127,6 +127,7 @@
       try {
         await fetch(scriptUrl, {
           method: "POST",
+          mode: "no-cors",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sku: selectedSKU, email, url }),
         });
