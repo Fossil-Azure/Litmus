@@ -2,21 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>SKU Search & Update</title>
+  <title>SKU Search & Update with Image Preview</title>
   <style>
     body {
       font-family: Arial, sans-serif;
       padding: 20px;
     }
-
-    /* Dropdown styling */
-    #skuDropdown {
-      width: 100%;
-      padding: 8px;
-      font-size: 1rem;
-      margin-bottom: 10px;
-    }
-
+    /* Search and Dropdown styling */
     #searchInput {
       width: 100%;
       padding: 8px;
@@ -24,7 +16,13 @@
       margin-bottom: 10px;
       box-sizing: border-box;
     }
-
+    #skuDropdown {
+      width: 100%;
+      padding: 8px;
+      font-size: 1rem;
+      margin-bottom: 10px;
+    }
+    /* Form styling */
     #emailForm {
       margin-top: 20px;
       padding: 20px;
@@ -32,14 +30,12 @@
       border-radius: 8px;
       max-width: 500px;
     }
-
     #emailForm input {
       width: 100%;
       padding: 8px;
       margin-bottom: 10px;
       box-sizing: border-box;
     }
-
     #emailForm button {
       padding: 10px 20px;
       background: #007BFF;
@@ -48,9 +44,16 @@
       border-radius: 6px;
       cursor: pointer;
     }
-
     #emailForm button:hover {
       background: #0056b3;
+    }
+    /* SKU Image Preview */
+    #skuImagePreview {
+      max-width: 200px;
+      display: block;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
     }
   </style>
 </head>
@@ -68,15 +71,17 @@
 
   <!-- Update form -->
   <div id="emailForm" style="display: none;">
-    <h3>Update Email(s) and URL(s) for SKU: <span id="selectedSKUDisplay"></span></h3>
+    <h3>Update Data for SKU: <span id="selectedSKUDisplay"></span></h3>
+    <!-- Image preview for the selected SKU -->
+    <img id="skuImagePreview" src="" alt="SKU Image Preview" style="display:none;" />
     <input type="text" id="emailInput" placeholder="Email(s), comma-separated" />
     <input type="text" id="urlInput" placeholder="URL(s), comma-separated" />
     <button id="submitBtn">Submit</button>
   </div>
 
   <script>
-    const scriptUrl = "https://script.google.com/macros/s/AKfycbzKUr8RX_Q9e2iZBENMyIaOQ6lT84icRt8bHMLDZNO0n7lk_oINJJV8cxYmP__7wivfmg/exec"; // Replace with your deployed script URL
-    let allItems = [];  // Will store all items from the sheet
+    const scriptUrl = "https://script.google.com/macros/s/AKfycbzKUr8RX_Q9e2iZBENMyIaOQ6lT84icRt8bHMLDZNO0n7lk_oINJJV8cxYmP__7wivfmg/exec";  // Replace with your actual Apps Script URL
+    let allItems = [];  // will hold all items fetched from the sheet
     let selectedSKU = null;
 
     // Fetch items from the sheet
@@ -89,21 +94,22 @@
         populateDropdown(allItems);
       } catch (error) {
         console.error("Error loading items:", error);
-        alert("Could not load items. Make sure your script is deployed as Web App and shared publicly.");
+        alert("Could not load items. Make sure your script is deployed as a Web App and shared publicly.");
       }
     }
 
-    // Populate the dropdown with SKU data (and display brand for reference)
+    // Populate the dropdown with SKU options
     function populateDropdown(items) {
       const dropdown = document.getElementById("skuDropdown");
-      dropdown.innerHTML = ""; // Clear existing options
+      dropdown.innerHTML = ""; // Clear previous options
       items.forEach(item => {
-        // Assuming your sheet uses property names that match your header names
         const option = document.createElement("option");
         option.value = item.sku;
         option.textContent = `${item.sku} (${item.brand || "No Brand"})`;
-        option.dataset.email = item.email || "";  // store existing email
-        option.dataset.url = item.url || "";        // store existing url
+        // Store additional item data in data attributes
+        option.dataset.email = item.email || "";
+        option.dataset.url = item.url || "";
+        option.dataset.image = item.image || "";
         dropdown.appendChild(option);
       });
     }
@@ -115,23 +121,32 @@
       const options = dropdown.getElementsByTagName("option");
       for (let option of options) {
         if (option.value.toLowerCase().indexOf(searchTerm) > -1) {
-          option.style.display = "";  // Show
+          option.style.display = "";  // Show matching options
         } else {
-          option.style.display = "none";  // Hide
+          option.style.display = "none";  // Hide non-matching options
         }
       }
     }
 
-    // When a dropdown option is selected, show the form and prefill data
+    // When a dropdown option is selected, show the form and prefill data (including image preview)
     document.getElementById("skuDropdown").addEventListener("change", (e) => {
       const selectedOption = e.target.selectedOptions[0];
       if (selectedOption) {
         selectedSKU = selectedOption.value;
         document.getElementById("selectedSKUDisplay").textContent = selectedSKU;
         document.getElementById("emailForm").style.display = "block";
-        // Prefill with existing data
+        // Prefill email and URL fields
         document.getElementById("emailInput").value = selectedOption.dataset.email;
         document.getElementById("urlInput").value = selectedOption.dataset.url;
+        // Set the image preview (if available)
+        const imgSrc = selectedOption.dataset.image;
+        const imgElement = document.getElementById("skuImagePreview");
+        if (imgSrc) {
+          imgElement.src = imgSrc;
+          imgElement.style.display = "block";
+        } else {
+          imgElement.style.display = "none";
+        }
       }
     });
 
@@ -151,13 +166,12 @@
       try {
         await fetch(scriptUrl, {
           method: "POST",
-          mode: "no-cors", // use no-cors if you don't need to inspect the returned response
+          mode: "no-cors",  // For local development if needed; response is opaque
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ sku: selectedSKU, email, url }),
         });
-
         alert("Data submitted successfully!");
-        // Optionally, refresh your dropdown data after submit
+        // Optionally, refresh the dropdown data after submission
         loadItems();
         // Hide the form
         document.getElementById("emailForm").style.display = "none";
