@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Email Selector</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      background-color: #f4f4f4;
+    }
+    .card {
+      display: flex;
+      align-items: center;
+      background: white;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      cursor: pointer;
+    }
+    .card img {
+      width: 100px;
+      height: auto;
+      margin-right: 20px;
+    }
+    .card.selected {
+      border: 2px solid #007BFF;
+    }
+    #emailForm {
+      margin-top: 20px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Select an Image & Enter Your Email</h1>
+  <div id="items"></div>
+
+  <div id="emailForm">
+    <h3>Enter your email for selected item:</h3>
+    <input type="email" id="emailInput" placeholder="Your email..." required />
+    <button id="submitBtn">Submit</button>
+  </div>
+
+  <script>
+    const scriptUrl = 'https://script.google.com/macros/s/AKfycbz88WgBGcmW_zvDMO7mfuaz0jx4YiaIOGXtsq3U96AHtXX1Nrz6fOK1IEzTdzvVn0Kg6A/exec';
+    let selectedSKU = null;
+
+    async function loadItems() {
+      try {
+        const res = await fetch(scriptUrl);
+        const data = await res.json();
+        const itemsContainer = document.getElementById("items");
+
+        data.forEach(item => {
+          const card = document.createElement("div");
+          card.className = "card";
+          card.innerHTML = `
+            <img src="${item.Image}" alt="${item.Brand}" />
+            <div>
+              <p><strong>Brand:</strong> ${item.Brand}</p>
+              <p><strong>SKU:</strong> ${item.SKU}</p>
+              <p><strong>Campaign:</strong> ${item.Campaign}</p>
+              <p><strong>Expiry:</strong> ${item["Expiry Date"]}</p>
+            </div>
+          `;
+          card.onclick = () => {
+            document.querySelectorAll('.card').forEach(c => c.classList.remove("selected"));
+            card.classList.add("selected");
+            selectedSKU = item.SKU;
+            document.getElementById("emailForm").style.display = "block";
+          };
+          itemsContainer.appendChild(card);
+        });
+      } catch (error) {
+        console.error("Failed to load items:", error);
+      }
+    }
+
+    document.getElementById("submitBtn").onclick = async () => {
+      const email = document.getElementById("emailInput").value;
+      if (!selectedSKU || !email) {
+        alert("Please select an item and enter your email.");
+        return;
+      }
+
+      try {
+        await fetch(scriptUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ sku: selectedSKU, email }),
+        });
+
+        alert("Email submitted successfully!");
+        document.getElementById("emailForm").style.display = "none";
+        document.getElementById("emailInput").value = "";
+        document.querySelectorAll('.card').forEach(c => c.classList.remove("selected"));
+      } catch (err) {
+        console.error("Failed to submit email:", err);
+        alert("There was a problem submitting your email.");
+      }
+    };
+
+    loadItems();
+  </script>
+
+</body>
+</html>
