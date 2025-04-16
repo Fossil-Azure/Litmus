@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>SKU Search & Update</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+
+    /* Dropdown styling */
+    #skuDropdown {
+      width: 100%;
+      padding: 8px;
+      font-size: 1rem;
+      margin-bottom: 10px;
+    }
+
+    #searchInput {
+      width: 100%;
+      padding: 8px;
+      font-size: 1rem;
+      margin-bottom: 10px;
+      box-sizing: border-box;
+    }
+
+    #emailForm {
+      margin-top: 20px;
+      padding: 20px;
+      border: 1px solid #eee;
+      border-radius: 8px;
+      max-width: 500px;
+    }
+
+    #emailForm input {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+      box-sizing: border-box;
+    }
+
+    #emailForm button {
+      padding: 10px 20px;
+      background: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    #emailForm button:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Search SKU and Update Data</h1>
+
+  <!-- Search Box -->
+  <input type="text" id="searchInput" placeholder="Search SKU..." />
+
+  <!-- Dropdown for SKUs -->
+  <select id="skuDropdown" size="8">
+    <!-- Options will be populated here -->
+  </select>
+
+  <!-- Update form -->
+  <div id="emailForm" style="display: none;">
+    <h3>Update Email(s) and URL(s) for SKU: <span id="selectedSKUDisplay"></span></h3>
+    <input type="text" id="emailInput" placeholder="Email(s), comma-separated" />
+    <input type="text" id="urlInput" placeholder="URL(s), comma-separated" />
+    <button id="submitBtn">Submit</button>
+  </div>
+
+  <script>
+    const scriptUrl = "YOUR_SCRIPT_URL_HERE"; // Replace with your deployed script URL
+    let allItems = [];  // Will store all items from the sheet
+    let selectedSKU = null;
+
+    // Fetch items from the sheet
+    async function loadItems() {
+      try {
+        const res = await fetch(scriptUrl);
+        const data = await res.json();
+        // Assuming the response is { items: [...] }
+        allItems = data.items;
+        populateDropdown(allItems);
+      } catch (error) {
+        console.error("Error loading items:", error);
+        alert("Could not load items. Make sure your script is deployed as Web App and shared publicly.");
+      }
+    }
+
+    // Populate the dropdown with SKU data (and display brand for reference)
+    function populateDropdown(items) {
+      const dropdown = document.getElementById("skuDropdown");
+      dropdown.innerHTML = ""; // Clear existing options
+      items.forEach(item => {
+        // Assuming your sheet uses property names that match your header names
+        const option = document.createElement("option");
+        option.value = item.sku;
+        option.textContent = `${item.sku} (${item.brand || "No Brand"})`;
+        option.dataset.email = item.email || "";  // store existing email
+        option.dataset.url = item.url || "";        // store existing url
+        dropdown.appendChild(option);
+      });
+    }
+
+    // Filter dropdown options based on search input
+    function filterDropdown() {
+      const searchTerm = document.getElementById("searchInput").value.toLowerCase();
+      const dropdown = document.getElementById("skuDropdown");
+      const options = dropdown.getElementsByTagName("option");
+      for (let option of options) {
+        if (option.value.toLowerCase().indexOf(searchTerm) > -1) {
+          option.style.display = "";  // Show
+        } else {
+          option.style.display = "none";  // Hide
+        }
+      }
+    }
+
+    // When a dropdown option is selected, show the form and prefill data
+    document.getElementById("skuDropdown").addEventListener("change", (e) => {
+      const selectedOption = e.target.selectedOptions[0];
+      if (selectedOption) {
+        selectedSKU = selectedOption.value;
+        document.getElementById("selectedSKUDisplay").textContent = selectedSKU;
+        document.getElementById("emailForm").style.display = "block";
+        // Prefill with existing data
+        document.getElementById("emailInput").value = selectedOption.dataset.email;
+        document.getElementById("urlInput").value = selectedOption.dataset.url;
+      }
+    });
+
+    // Listen for search input changes
+    document.getElementById("searchInput").addEventListener("input", filterDropdown);
+
+    // Submit handler to update data
+    document.getElementById("submitBtn").onclick = async () => {
+      const email = document.getElementById("emailInput").value.trim();
+      const url = document.getElementById("urlInput").value.trim();
+
+      if (!selectedSKU || !email) {
+        alert("Please select an SKU and enter at least one email.");
+        return;
+      }
+
+      try {
+        await fetch(scriptUrl, {
+          method
