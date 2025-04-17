@@ -2,150 +2,186 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Sheet Viewer</title>
+  <title>SKU Manager</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-    }
-
-    .card {
-      border: 1px solid #ccc;
-      padding: 15px;
-      margin: 10px;
-      display: inline-block;
-      width: 250px;
-      vertical-align: top;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: 0.2s;
-    }
-
-    .card.selected {
-      border: 2px solid #007BFF;
-      background-color: #f0f8ff;
-    }
-
-    .card img {
-      width: 100%;
-      height: 150px;
-      object-fit: cover;
-      border-radius: 6px;
-    }
-
-    #emailForm {
-      margin-top: 20px;
-      padding: 20px;
-      border: 1px solid #eee;
-      border-radius: 8px;
-      max-width: 500px;
-    }
-
-    #emailForm input {
-      width: 100%;
-      padding: 8px;
-      margin-bottom: 10px;
-    }
-
-    #emailForm button {
-      padding: 10px 20px;
-      background: #007BFF;
-      color: white;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-
-    #emailForm button:hover {
-      background: #0056b3;
-    }
+    body { font-family: Arial, sans-serif; padding: 20px; max-width: 1000px; margin: auto; }
+    h1 { margin-bottom: 10px; }
+    select, input { width: 100%; padding: 8px; margin: 10px 0; }
+    button { padding: 10px 20px; background: #007BFF; color: white; border: none; cursor: pointer; }
+    button:hover { background: #0056b3; }
+    #skuImagePreview { max-width: 200px; margin-top: 10px; display: none; border: 1px solid #ccc; border-radius: 5px; }
+    .card-container { display: flex; flex-wrap: wrap; gap: 15px; margin-top: 30px; }
+    .card { width: 200px; border: 1px solid #ccc; border-radius: 10px; padding: 10px; text-align: center; cursor: pointer; transition: 0.2s; }
+    .card:hover { box-shadow: 0 0 8px rgba(0,0,0,0.2); }
+    .card img { width: 100%; height: 120px; object-fit: cover; border-radius: 6px; }
+    #emailForm { margin-top: 20px; border: 1px solid #ddd; padding: 20px; border-radius: 10px; }
   </style>
 </head>
 <body>
 
-  <h1>Google Sheet Item Selector</h1>
-  <div id="cardContainer"></div>
+  <h1>SKU Manager</h1>
 
-  <div id="emailForm" style="display: none;">
-    <h3>Update Email(s) and URL(s):</h3>
-    <input type="text" id="emailInput" placeholder="Email(s), comma-separated" />
-    <input type="text" id="urlInput" placeholder="URL(s), comma-separated" />
+  <label for="sheetSelector">Select Sheet:</label>
+  <select id="sheetSelector"></select>
+
+  <label for="searchInput">Search SKU:</label>
+  <input type="text" id="searchInput" placeholder="Search SKU..." />
+  <select id="skuDropdown" size="5"></select>
+
+  <div id="emailForm" style="display:none;">
+    <h3>Selected SKU: <span id="selectedSKUDisplay"></span></h3>
+    <img id="skuImagePreview" src="" alt="SKU Image" />
+    <input type="text" id="emailInput" placeholder="Emails (comma-separated)" />
+    <input type="text" id="urlInput" placeholder="URLs (comma-separated)" />
     <button id="submitBtn">Submit</button>
   </div>
 
+  <h2>All SKUs in Selected Sheet</h2>
+  <div id="cardView" class="card-container"></div>
+
   <script>
-    const scriptUrl = "https://script.google.com/macros/s/AKfycbzKUr8RX_Q9e2iZBENMyIaOQ6lT84icRt8bHMLDZNO0n7lk_oINJJV8cxYmP__7wivfmg/exec"; // ← Replace this
-    let selectedSKU = null;
+    const scriptUrl = "https://script.google.com/macros/s/AKfycbzKUr8RX_Q9e2iZBENMyIaOQ6lT84icRt8bHMLDZNO0n7lk_oINJJV8cxYmP__7wivfmg/exec"; // <-- Replace with your Apps Script URL
     let allItems = [];
+    let selectedSKU = "";
+    let currentSheet = "";
 
-    async function loadItems() {
+    // Fetch available sheets
+    async function fetchSheets() {
       try {
-        const response = await fetch(scriptUrl);
-        const data = await response.json();
-        allItems = data.items;
-
-        const container = document.getElementById("cardContainer");
-        container.innerHTML = "";
-
-        allItems.forEach(item => {
-          const card = document.createElement("div");
-          card.className = "card";
-          card.innerHTML = `
-            <img src="${item.image}" alt="Image" />
-            <p><strong>Brand:</strong> ${item.brand}</p>
-            <p><strong>SKU:</strong> ${item.sku}</p>
-            <p><strong>Campaign:</strong> ${item.campaign}</p>
-          `;
-
-          card.addEventListener("click", () => {
-            document.querySelectorAll(".card").forEach(c => c.classList.remove("selected"));
-            card.classList.add("selected");
-
-            selectedSKU = item.sku;
-            document.getElementById("emailForm").style.display = "block";
-            document.getElementById("emailInput").value = item.email || "";
-            document.getElementById("urlInput").value = item.url || "";
-          });
-
-          container.appendChild(card);
+        const res = await fetch(`${scriptUrl}?action=sheets`);
+        const data = await res.json();
+        const selector = document.getElementById("sheetSelector");
+        selector.innerHTML = "";
+        data.sheets.forEach(name => {
+          const opt = document.createElement("option");
+          opt.value = name;
+          opt.textContent = name;
+          selector.appendChild(opt);
         });
+        currentSheet = selector.value;
+        loadItems();
       } catch (err) {
-        console.error("Error loading items:", err);
-        alert("Could not load items. Make sure your script is deployed as Web App and shared publicly.");
+        alert("Error loading sheet list.");
+        console.error(err);
       }
     }
 
-    document.getElementById("submitBtn").onclick = async () => {
+    // Load items from selected sheet
+    async function loadItems() {
+      try {
+        const res = await fetch(`${scriptUrl}?sheet=${encodeURIComponent(currentSheet)}`);
+        const data = await res.json();
+        allItems = data.items;
+        populateDropdown(allItems);
+        renderCards(allItems);
+      } catch (err) {
+        alert("Could not load items.");
+        console.error(err);
+      }
+    }
+
+    // Populate dropdown from data
+    function populateDropdown(items) {
+      const dropdown = document.getElementById("skuDropdown");
+      dropdown.innerHTML = "";
+      items.forEach(item => {
+        const opt = document.createElement("option");
+        opt.value = item.sku;
+        opt.textContent = `${item.sku} (${item.brand || ""})`;
+        opt.dataset.image = item.image || "";
+        opt.dataset.email = item.email || "";
+        opt.dataset.url = item.url || "";
+        dropdown.appendChild(opt);
+      });
+    }
+
+    // Display cards
+    function renderCards(items) {
+      const container = document.getElementById("cardView");
+      container.innerHTML = "";
+      items.forEach(item => {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+          <img src="${item.image || ''}" alt="${item.sku}" />
+          <div><strong>${item.sku}</strong></div>
+          <div>${item.brand || ''}</div>
+        `;
+        card.onclick = () => fillForm(item);
+        container.appendChild(card);
+      });
+    }
+
+    // Fill form with SKU data
+    function fillForm(item) {
+      selectedSKU = item.sku;
+      document.getElementById("selectedSKUDisplay").textContent = item.sku;
+      document.getElementById("emailInput").value = item.email || "";
+      document.getElementById("urlInput").value = item.url || "";
+      const img = document.getElementById("skuImagePreview");
+      if (item.image) {
+        img.src = item.image;
+        img.style.display = "block";
+      } else {
+        img.style.display = "none";
+      }
+      document.getElementById("emailForm").style.display = "block";
+    }
+
+    // Filter dropdown by search
+    document.getElementById("searchInput").addEventListener("input", () => {
+      const value = document.getElementById("searchInput").value.toLowerCase();
+      const options = document.getElementById("skuDropdown").options;
+      for (let option of options) {
+        option.style.display = option.value.toLowerCase().includes(value) ? "" : "none";
+      }
+    });
+
+    // When dropdown is changed
+    document.getElementById("skuDropdown").addEventListener("change", e => {
+      const selected = e.target.selectedOptions[0];
+      if (selected) {
+        fillForm({
+          sku: selected.value,
+          email: selected.dataset.email,
+          url: selected.dataset.url,
+          image: selected.dataset.image
+        });
+      }
+    });
+
+    // Sheet selector
+    document.getElementById("sheetSelector").addEventListener("change", e => {
+      currentSheet = e.target.value;
+      loadItems();
+    });
+
+    // Submit form
+    document.getElementById("submitBtn").addEventListener("click", async () => {
       const email = document.getElementById("emailInput").value.trim();
       const url = document.getElementById("urlInput").value.trim();
-
-      if (!selectedSKU || !email) {
-        alert("Please select an item and enter at least one email.");
-        return;
-      }
-
+      if (!selectedSKU || !email) return alert("SKU and email required.");
       try {
         await fetch(scriptUrl, {
           method: "POST",
           mode: "no-cors",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sku: selectedSKU, email, url }),
+          body: JSON.stringify({
+            sku: selectedSKU,
+            email,
+            url,
+            sheet: currentSheet
+          })
         });
-
-        alert("Submitted successfully!");
-        document.getElementById("emailInput").value = "";
-        document.getElementById("urlInput").value = "";
-        document.getElementById("emailForm").style.display = "none";
-        document.querySelectorAll(".card").forEach(c => c.classList.remove("selected"));
-
-        loadItems(); // Refresh data
+        alert("Submitted!");
+        loadItems();
       } catch (err) {
-        console.error("Submission failed:", err);
-        alert("Submission failed. Check browser console for details.");
+        alert("Submission failed.");
+        console.error(err);
       }
-    };
+    });
 
-    loadItems();
+    fetchSheets();
   </script>
 </body>
 </html>
