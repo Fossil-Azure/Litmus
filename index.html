@@ -2,186 +2,123 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>SKU Manager</title>
+  <title>Litmus Viewer</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; max-width: 1000px; margin: auto; }
-    h1 { margin-bottom: 10px; }
-    select, input { width: 100%; padding: 8px; margin: 10px 0; }
-    button { padding: 10px 20px; background: #007BFF; color: white; border: none; cursor: pointer; }
-    button:hover { background: #0056b3; }
-    #skuImagePreview { max-width: 200px; margin-top: 10px; display: none; border: 1px solid #ccc; border-radius: 5px; }
-    .card-container { display: flex; flex-wrap: wrap; gap: 15px; margin-top: 30px; }
-    .card { width: 200px; border: 1px solid #ccc; border-radius: 10px; padding: 10px; text-align: center; cursor: pointer; transition: 0.2s; }
-    .card:hover { box-shadow: 0 0 8px rgba(0,0,0,0.2); }
-    .card img { width: 100%; height: 120px; object-fit: cover; border-radius: 6px; }
-    #emailForm { margin-top: 20px; border: 1px solid #ddd; padding: 20px; border-radius: 10px; }
+    body { font-family: Arial; padding: 20px; }
+    select, input, textarea, button { margin: 10px 0; padding: 8px; width: 100%; }
+    img { max-width: 200px; margin-top: 10px; }
+    .container { max-width: 600px; margin: auto; }
   </style>
 </head>
 <body>
+  <div class="container">
+    <h2>Litmus Image Sheet Viewer</h2>
 
-  <h1>SKU Manager</h1>
+    <label>Select Sheet:</label>
+    <select id="sheetSelector">
+      <option value="Litmus-JP">Litmus-JP</option>
+      <option value="Litmus-AU">Litmus-AU</option>
+      <option value="Litmus-IN">Litmus-IN</option>
+      <option value="Litmus-SGMY">Litmus-SGMY</option>
+    </select>
 
-  <label for="sheetSelector">Select Sheet:</label>
-  <select id="sheetSelector"></select>
+    <label>Select SKU:</label>
+    <select id="skuDropdown"></select>
 
-  <label for="searchInput">Search SKU:</label>
-  <input type="text" id="searchInput" placeholder="Search SKU..." />
-  <select id="skuDropdown" size="5"></select>
+    <div id="imagePreview"></div>
 
-  <div id="emailForm" style="display:none;">
-    <h3>Selected SKU: <span id="selectedSKUDisplay"></span></h3>
-    <img id="skuImagePreview" src="" alt="SKU Image" />
-    <input type="text" id="emailInput" placeholder="Emails (comma-separated)" />
-    <input type="text" id="urlInput" placeholder="URLs (comma-separated)" />
-    <button id="submitBtn">Submit</button>
+    <label>Email (comma separated):</label>
+    <textarea id="emailInput" rows="2"></textarea>
+
+    <label>URLs (comma separated):</label>
+    <textarea id="urlInput" rows="2"></textarea>
+
+    <button onclick="submitData()">Submit</button>
   </div>
 
-  <h2>All SKUs in Selected Sheet</h2>
-  <div id="cardView" class="card-container"></div>
-
   <script>
-    const scriptUrl = "https://script.google.com/macros/s/AKfycbzaY9iKQkZsZktpUFVze0prwxBxUPvUzAV-oiLH8ECwwH1gx_Rdgq7mxaPaWFaEyQCfHw/exec"; // <-- Replace with your Apps Script URL
-    let allItems = [];
-    let selectedSKU = "";
-    let currentSheet = "";
+    const baseURL = 'https://script.google.com/macros/s/AKfycbz4fRl2djYHiBUf7p6mj5FZ7IIcEmbqsaAah5RYxBgyjmsPvAHqOfEHQP9Awr89SFDoUA/exec';
+    let currentSheetData = [];
 
-    // Fetch available sheets
-    async function fetchSheets() {
-      try {
-        const res = await fetch(`${scriptUrl}?action=sheets`);
-        const data = await res.json();
-        const selector = document.getElementById("sheetSelector");
-        selector.innerHTML = "";
-        data.sheets.forEach(name => {
-          const opt = document.createElement("option");
-          opt.value = name;
-          opt.textContent = name;
-          selector.appendChild(opt);
+    const sheetSelector = document.getElementById('sheetSelector');
+    const skuDropdown = document.getElementById('skuDropdown');
+    const emailInput = document.getElementById('emailInput');
+    const urlInput = document.getElementById('urlInput');
+    const imagePreview = document.getElementById('imagePreview');
+
+    sheetSelector.addEventListener('change', loadSheet);
+    skuDropdown.addEventListener('change', showImageForSelectedSKU);
+
+    function loadSheet() {
+      const sheet = sheetSelector.value;
+      fetch(`${baseURL}?sheet=${sheet}`)
+        .then(response => {
+          if (!response.ok || !response.headers.get("content-type")?.includes("application/json")) {
+            return response.text().then(text => { throw new Error(text); });
+          }
+          return response.json();
+        })
+        .then(data => {
+          currentSheetData = data;
+          populateSKUs(data);
+        })
+        .catch(err => {
+          alert("Error: " + err.message);
         });
-        currentSheet = selector.value;
-        loadItems();
-      } catch (err) {
-        alert("Error loading sheet list.");
-        console.error(err);
-      }
     }
 
-    // Load items from selected sheet
-    async function loadItems() {
-      try {
-        const res = await fetch(`${scriptUrl}?sheet=${encodeURIComponent(currentSheet)}`);
-        const data = await res.json();
-        allItems = data.items;
-        populateDropdown(allItems);
-        renderCards(allItems);
-      } catch (err) {
-        alert("Could not load items.");
-        console.error(err);
-      }
-    }
-
-    // Populate dropdown from data
-    function populateDropdown(items) {
-      const dropdown = document.getElementById("skuDropdown");
-      dropdown.innerHTML = "";
-      items.forEach(item => {
-        const opt = document.createElement("option");
-        opt.value = item.sku;
-        opt.textContent = `${item.sku} (${item.brand || ""})`;
-        opt.dataset.image = item.image || "";
-        opt.dataset.email = item.email || "";
-        opt.dataset.url = item.url || "";
-        dropdown.appendChild(opt);
+    function populateSKUs(data) {
+      skuDropdown.innerHTML = '';
+      data.forEach(row => {
+        const option = document.createElement('option');
+        option.value = row.SKU;
+        option.textContent = row.SKU;
+        skuDropdown.appendChild(option);
       });
+      showImageForSelectedSKU();
     }
 
-    // Display cards
-    function renderCards(items) {
-      const container = document.getElementById("cardView");
-      container.innerHTML = "";
-      items.forEach(item => {
-        const card = document.createElement("div");
-        card.className = "card";
-        card.innerHTML = `
-          <img src="${item.image || ''}" alt="${item.sku}" />
-          <div><strong>${item.sku}</strong></div>
-          <div>${item.brand || ''}</div>
-        `;
-        card.onclick = () => fillForm(item);
-        container.appendChild(card);
-      });
-    }
-
-    // Fill form with SKU data
-    function fillForm(item) {
-      selectedSKU = item.sku;
-      document.getElementById("selectedSKUDisplay").textContent = item.sku;
-      document.getElementById("emailInput").value = item.email || "";
-      document.getElementById("urlInput").value = item.url || "";
-      const img = document.getElementById("skuImagePreview");
-      if (item.image) {
-        img.src = item.image;
-        img.style.display = "block";
-      } else {
-        img.style.display = "none";
-      }
-      document.getElementById("emailForm").style.display = "block";
-    }
-
-    // Filter dropdown by search
-    document.getElementById("searchInput").addEventListener("input", () => {
-      const value = document.getElementById("searchInput").value.toLowerCase();
-      const options = document.getElementById("skuDropdown").options;
-      for (let option of options) {
-        option.style.display = option.value.toLowerCase().includes(value) ? "" : "none";
-      }
-    });
-
-    // When dropdown is changed
-    document.getElementById("skuDropdown").addEventListener("change", e => {
-      const selected = e.target.selectedOptions[0];
+    function showImageForSelectedSKU() {
+      const sku = skuDropdown.value;
+      const selected = currentSheetData.find(item => item.SKU === sku);
       if (selected) {
-        fillForm({
-          sku: selected.value,
-          email: selected.dataset.email,
-          url: selected.dataset.url,
-          image: selected.dataset.image
-        });
+        imagePreview.innerHTML = `
+          <strong>Brand:</strong> ${selected.Brand}<br/>
+          <img src="${selected.Url}" alt="Selected Image"/>
+        `;
+        emailInput.value = selected.Email || '';
+        urlInput.value = selected.Url || '';
       }
-    });
+    }
 
-    // Sheet selector
-    document.getElementById("sheetSelector").addEventListener("change", e => {
-      currentSheet = e.target.value;
-      loadItems();
-    });
+    function submitData() {
+      const sku = skuDropdown.value;
+      const sheet = sheetSelector.value;
+      const email = emailInput.value.trim();
+      const url = urlInput.value.trim();
 
-    // Submit form
-    document.getElementById("submitBtn").addEventListener("click", async () => {
-      const email = document.getElementById("emailInput").value.trim();
-      const url = document.getElementById("urlInput").value.trim();
-      if (!selectedSKU || !email) return alert("SKU and email required.");
-      try {
-        await fetch(scriptUrl, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            sku: selectedSKU,
-            email,
-            url,
-            sheet: currentSheet
-          })
-        });
-        alert("Submitted!");
-        loadItems();
-      } catch (err) {
-        alert("Submission failed.");
-        console.error(err);
+      if (!email || !url) {
+        alert("Please enter both email and URL.");
+        return;
       }
-    });
 
-    fetchSheets();
+      fetch(baseURL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sku, sheet, email, url })
+      })
+      .then(res => res.text())
+      .then(msg => {
+        alert("Updated successfully.");
+        loadSheet(); // refresh to show updates
+      })
+      .catch(err => {
+        alert("Error submitting: " + err.message);
+      });
+    }
+
+    // Initial load
+    loadSheet();
   </script>
 </body>
 </html>
