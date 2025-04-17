@@ -1,158 +1,227 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Litmus Sheet Viewer</title>
+  <meta charset="UTF-8" />
+  <title>SKU Selector</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    .card { border: 1px solid #ddd; border-radius: 10px; padding: 10px; margin: 10px 0; }
-    img { max-width: 100px; display: block; }
-    #previewImage { max-width: 200px; margin-top: 10px; }
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+
+    #searchInput {
+      width: 100%;
+      padding: 8px;
+      font-size: 1rem;
+      margin-bottom: 10px;
+    }
+
+    #skuDropdown {
+      width: 100%;
+      padding: 8px;
+      font-size: 1rem;
+      margin-bottom: 10px;
+    }
+
+    #emailForm {
+      margin-top: 20px;
+      padding: 20px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      max-width: 500px;
+    }
+
+    #emailForm input {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 10px;
+    }
+
+    #emailForm button {
+      padding: 10px 20px;
+      background: #007BFF;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    #emailForm button:hover {
+      background: #0056b3;
+    }
+
+    #skuImagePreview {
+      max-width: 200px;
+      display: block;
+      margin-bottom: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    .card-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 15px;
+      margin-top: 30px;
+    }
+
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      padding: 10px;
+      text-align: center;
+      cursor: pointer;
+      transition: box-shadow 0.3s;
+    }
+
+    .card:hover {
+      box-shadow: 0 0 10px rgba(0,0,0,0.2);
+    }
+
+    .card img {
+      width: 100%;
+      max-height: 150px;
+      object-fit: cover;
+      border-radius: 6px;
+    }
+
+    .card .sku {
+      font-weight: bold;
+      margin-top: 10px;
+    }
+
+    .card .brand {
+      color: #666;
+    }
   </style>
 </head>
 <body>
 
-  <h2>Litmus Sheet Viewer</h2>
+  <h1>SKU Search & Update</h1>
 
-  <label for="sheetSelect">Select Sheet:</label>
-  <select id="sheetSelect"></select>
+  <input type="text" id="searchInput" placeholder="Search SKU..." />
+  <select id="skuDropdown" size="6"></select>
 
-  <br><br>
+  <div id="emailForm" style="display: none;">
+    <h3>Update Data for SKU: <span id="selectedSKUDisplay"></span></h3>
+    <img id="skuImagePreview" src="" alt="Preview Image" style="display:none;" />
+    <input type="text" id="emailInput" placeholder="Emails (comma-separated)" />
+    <input type="text" id="urlInput" placeholder="URLs (comma-separated)" />
+    <button id="submitBtn">Submit</button>
+  </div>
 
-  <label for="skuSelect">Select SKU:</label>
-  <select id="skuSelect"></select>
-
-  <div id="previewImageContainer"></div>
-
-  <br>
-
-  <label for="emailInput">Enter Email(s):</label>
-  <input type="text" id="emailInput" placeholder="Separate multiple with commas">
-
-  <br><br>
-
-  <label for="urlInput">Enter URL(s):</label>
-  <input type="text" id="urlInput" placeholder="Separate multiple with commas">
-
-  <br><br>
-
-  <button onclick="submitForm()">Submit</button>
-
-  <div id="resultMessage"></div>
-
-  <h3>Items</h3>
-  <div id="itemsContainer"></div>
+  <h2 style="margin-top: 40px;">All SKUs</h2>
+  <div id="cardView" class="card-container"></div>
 
   <script>
-  const API_URL = 'https://corsproxy.io/?https://script.google.com/macros/s/AKfycbws2cYpasRovL0V9rQ4TKkMoBld43u2oMRU5mzL9TDj-Qn-JNF3HNf3VPJ3a6Ypt7Qndw/exec';
+    const scriptUrl = "https://script.google.com/macros/s/AKfycbx9Twx73J4w8spYFTYKXEIlmOjift-yBUZJVT4GrWKD-I0Oj5Jfw5cReEHGrVldbnyF7Q/exec"; // Replace with actual Apps Script URL
+    let allItems = [];
+    let selectedSKU = null;
 
-    let allData = [];
-    let currentSheet = "";
-
-    async function fetchSheets() {
+    async function loadItems() {
       try {
-        const res = await fetch(API_URL + '?meta=true');
-        const sheets = await res.json();
-        const sheetSelect = document.getElementById("sheetSelect");
-        sheets.forEach(name => {
-          const opt = document.createElement("option");
-          opt.value = name;
-          opt.textContent = name;
-          sheetSelect.appendChild(opt);
-        });
-        currentSheet = sheets[0];
-        loadItems(currentSheet);
-        sheetSelect.addEventListener("change", e => {
-          currentSheet = e.target.value;
-          loadItems(currentSheet);
-        });
-      } catch (err) {
-        console.error("Error fetching sheets:", err);
-        document.getElementById("resultMessage").textContent = "Could not load sheets.";
-      }
-    }
-
-    async function loadItems(sheetName) {
-      try {
-        const res = await fetch(`${API_URL}?sheet=${sheetName}`);
+        const res = await fetch(scriptUrl);
         const data = await res.json();
-        allData = data;
-        populateSKUSelect(data);
-        displayCards(data);
+        allItems = data.items;
+        populateDropdown(allItems);
+        renderCards(allItems);
       } catch (err) {
-        console.error("Error loading items:", err);
-        document.getElementById("resultMessage").textContent = "Could not load items.";
+        console.error("Load error:", err);
+        alert("Failed to load items. Is your script shared and deployed correctly?");
       }
     }
 
-    function populateSKUSelect(data) {
-      const skuSelect = document.getElementById("skuSelect");
-      skuSelect.innerHTML = '';
-      data.forEach(item => {
+    function populateDropdown(items) {
+      const dropdown = document.getElementById("skuDropdown");
+      dropdown.innerHTML = "";
+      items.forEach(item => {
         const opt = document.createElement("option");
-        opt.value = item.SKU;
-        opt.textContent = `${item.SKU} - ${item.Brand}`;
-        skuSelect.appendChild(opt);
+        opt.value = item.sku;
+        opt.textContent = `${item.sku} (${item.brand || "No Brand"})`;
+        opt.dataset.email = item.email || "";
+        opt.dataset.url = item.url || "";
+        opt.dataset.image = item.image || "";
+        dropdown.appendChild(opt);
       });
-      skuSelect.addEventListener("change", updatePreview);
-      updatePreview();
     }
 
-    function updatePreview() {
-      const sku = document.getElementById("skuSelect").value;
-      const item = allData.find(d => d.SKU === sku);
-      const preview = document.getElementById("previewImageContainer");
-      if (item && item.Image) {
-        preview.innerHTML = `<img id="previewImage" src="${item.Image}" alt="Preview">`;
-      } else {
-        preview.innerHTML = "";
-      }
-
-      document.getElementById("emailInput").value = item?.Email || "";
-      document.getElementById("urlInput").value = item?.Url || "";
-    }
-
-    async function submitForm() {
-      const sheet = currentSheet;
-      const sku = document.getElementById("skuSelect").value;
-      const email = document.getElementById("emailInput").value;
-      const url = document.getElementById("urlInput").value;
-
-      try {
-        const res = await fetch(API_URL, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sheet, sku, email, url })
-        });
-        const text = await res.text();
-        document.getElementById("resultMessage").textContent = text;
-        loadItems(sheet); // refresh
-      } catch (err) {
-        console.error("Submit failed:", err);
-        document.getElementById("resultMessage").textContent = "Error submitting.";
-      }
-    }
-
-    function displayCards(data) {
-      const container = document.getElementById("itemsContainer");
+    function renderCards(items) {
+      const container = document.getElementById("cardView");
       container.innerHTML = "";
-      data.forEach(item => {
-        const div = document.createElement("div");
-        div.className = "card";
-        div.innerHTML = `
-          <strong>Brand:</strong> ${item.Brand}<br>
-          <strong>SKU:</strong> ${item.SKU}<br>
-          <strong>Campaign:</strong> ${item.Campaign}<br>
-          <strong>Email:</strong> ${item.Email || "N/A"}<br>
-          <strong>URL:</strong> ${item.Url || "N/A"}<br>
-          ${item.Image ? `<img src="${item.Image}">` : ""}
+      items.forEach(item => {
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML = `
+          <img src="${item.image || ''}" alt="${item.sku}" />
+          <div class="sku">${item.sku}</div>
+          <div class="brand">${item.brand || ''}</div>
         `;
-        container.appendChild(div);
+        card.addEventListener("click", () => {
+          fillForm(item);
+        });
+        container.appendChild(card);
       });
     }
 
-    fetchSheets();
-  </script>
+    function fillForm(item) {
+      selectedSKU = item.sku;
+      document.getElementById("selectedSKUDisplay").textContent = selectedSKU;
+      document.getElementById("emailInput").value = item.email || "";
+      document.getElementById("urlInput").value = item.url || "";
+      const img = document.getElementById("skuImagePreview");
+      if (item.image) {
+        img.src = item.image;
+        img.style.display = "block";
+      } else {
+        img.style.display = "none";
+      }
+      document.getElementById("emailForm").style.display = "block";
+    }
 
+    document.getElementById("skuDropdown").addEventListener("change", e => {
+      const opt = e.target.selectedOptions[0];
+      if (opt) {
+        const item = {
+          sku: opt.value,
+          email: opt.dataset.email,
+          url: opt.dataset.url,
+          image: opt.dataset.image
+        };
+        fillForm(item);
+      }
+    });
+
+    document.getElementById("searchInput").addEventListener("input", () => {
+      const search = document.getElementById("searchInput").value.toLowerCase();
+      const options = document.getElementById("skuDropdown").options;
+      for (let opt of options) {
+        opt.style.display = opt.value.toLowerCase().includes(search) ? "" : "none";
+      }
+    });
+
+    document.getElementById("submitBtn").onclick = async () => {
+      const email = document.getElementById("emailInput").value.trim();
+      const url = document.getElementById("urlInput").value.trim();
+      if (!selectedSKU || !email) {
+        alert("Select a SKU and enter at least one email.");
+        return;
+      }
+      try {
+        await fetch(scriptUrl, {
+          method: "POST",
+          mode: "no-cors", // remove if you set CORS properly in Apps Script
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sku: selectedSKU, email, url }),
+        });
+        alert("Submitted!");
+        loadItems();
+      } catch (e) {
+        console.error("Submit error:", e);
+        alert("Failed to submit.");
+      }
+    };
+
+    loadItems();
+  </script>
 </body>
 </html>
