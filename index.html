@@ -207,12 +207,12 @@
         return;
       }
       try {
-        await fetch(scriptUrl, {
-          method: "POST",
-          mode: "no-cors", // remove if you set CORS properly in Apps Script
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sku: selectedSKU, email, url }),
-        });
+      await fetch(scriptUrl, {
+  method: "POST",
+  mode: "no-cors",       // <-- add this line
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ sku: selectedSKU, email, url }),
+});
         alert("Submitted!");
         loadItems();
       } catch (e) {
