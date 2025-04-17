@@ -37,6 +37,28 @@
   </div>
 
   <script>
+    fetch('https://script.google.com/macros/s/AKfycbxgjijLnDzOU1wOB1DVZDu5BiAziZgLk_dH5IKbnZN8AXNfe41iRlPBz8IyGCVLzpSkBA/exec', {
+  method: 'POST',
+  mode: 'no-cors',  // Add this line to bypass CORS error
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    sku: "12345",
+    sheet: "Sheet1",
+    email: "user@example.com",
+    url: "http://example.com"
+  })
+})
+.then(response => {
+  console.log('Data submitted successfully');
+  alert('Submission successful');
+})
+.catch(err => {
+  console.error('Error:', err);
+  alert("Error submitting: " + err.message);
+});
+
     const baseURL = 'https://script.google.com/macros/s/AKfycbxgjijLnDzOU1wOB1DVZDu5BiAziZgLk_dH5IKbnZN8AXNfe41iRlPBz8IyGCVLzpSkBA/exec';
     let currentSheetData = [];
 
