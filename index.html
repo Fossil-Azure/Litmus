@@ -2,146 +2,156 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Litmus Image Selector</title>
+  <title>Litmus Sheet Viewer</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-    }
-    select, input, textarea, button {
-      margin: 10px 0;
-      padding: 8px;
-      width: 100%;
-      max-width: 400px;
-    }
-    img {
-      max-width: 200px;
-      display: block;
-      margin-top: 10px;
-    }
-    .card {
-      border: 1px solid #ccc;
-      padding: 10px;
-      margin-top: 20px;
-    }
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 10px; margin: 10px 0; }
+    img { max-width: 100px; display: block; }
+    #previewImage { max-width: 200px; margin-top: 10px; }
   </style>
 </head>
 <body>
 
-  <h2>Litmus Image Selector</h2>
+  <h2>Litmus Sheet Viewer</h2>
 
   <label for="sheetSelect">Select Sheet:</label>
-  <select id="sheetSelect" onchange="loadItems()"></select>
+  <select id="sheetSelect"></select>
 
-  <label for="skuSelect">Search SKU:</label>
-  <select id="skuSelect" onchange="populateSelected()" style="width: 100%;"></select>
+  <br><br>
 
-  <div id="selectedImage"></div>
+  <label for="skuSelect">Select SKU:</label>
+  <select id="skuSelect"></select>
 
-  <label for="emailInput">Email(s):</label>
-  <textarea id="emailInput" placeholder="Enter emails separated by comma"></textarea>
+  <div id="previewImageContainer"></div>
 
-  <label for="urlInput">URL(s):</label>
-  <textarea id="urlInput" placeholder="Enter URLs separated by comma"></textarea>
+  <br>
+
+  <label for="emailInput">Enter Email(s):</label>
+  <input type="text" id="emailInput" placeholder="Separate multiple with commas">
+
+  <br><br>
+
+  <label for="urlInput">Enter URL(s):</label>
+  <input type="text" id="urlInput" placeholder="Separate multiple with commas">
+
+  <br><br>
 
   <button onclick="submitForm()">Submit</button>
 
-  <div class="card" id="cardContainer"></div>
+  <div id="resultMessage"></div>
+
+  <h3>Items</h3>
+  <div id="itemsContainer"></div>
 
   <script>
-    const scriptURL = "https://script.google.com/macros/s/AKfycbyyic9z-dI3yfGZ2wLQC1s4vLz5ObiFgaE1h1_If4j-5UVxKOcxcX3HrJY_P-h990QQrQ/exec"; // Replace with your deployed Web App URL
+    const API_URL = 'https://script.google.com/macros/s/AKfycbyS4MLBUOxlJu4izYDMWQMkOd6k4YglcLlG-gA6G2W_r1snQo7nHOmYlR-22mno3XCaGQ/exec';
+
     let allData = [];
+    let currentSheet = "";
 
-    function fetchSheets() {
-      fetch(`${scriptURL}?meta=true`)
-        .then(res => res.json())
-        .then(sheets => {
-          const sheetSelect = document.getElementById("sheetSelect");
-          sheetSelect.innerHTML = "";
-          sheets.forEach(sheet => {
-            let option = document.createElement("option");
-            option.value = sheet;
-            option.textContent = sheet;
-            sheetSelect.appendChild(option);
-          });
-          loadItems(); // Load data for first sheet
+    async function fetchSheets() {
+      try {
+        const res = await fetch(API_URL + '?meta=true');
+        const sheets = await res.json();
+        const sheetSelect = document.getElementById("sheetSelect");
+        sheets.forEach(name => {
+          const opt = document.createElement("option");
+          opt.value = name;
+          opt.textContent = name;
+          sheetSelect.appendChild(opt);
         });
+        currentSheet = sheets[0];
+        loadItems(currentSheet);
+        sheetSelect.addEventListener("change", e => {
+          currentSheet = e.target.value;
+          loadItems(currentSheet);
+        });
+      } catch (err) {
+        console.error("Error fetching sheets:", err);
+        document.getElementById("resultMessage").textContent = "Could not load sheets.";
+      }
     }
 
-    function loadItems() {
-      const sheet = document.getElementById("sheetSelect").value;
-      fetch(`${scriptURL}?sheet=${sheet}`)
-        .then(res => res.json())
-        .then(data => {
-          allData = data;
-          const skuSelect = document.getElementById("skuSelect");
-          skuSelect.innerHTML = "<option disabled selected>Select SKU</option>";
-          data.forEach(item => {
-            const option = document.createElement("option");
-            option.value = item.SKU;
-            option.textContent = `${item.SKU} (${item.Brand})`;
-            skuSelect.appendChild(option);
-          });
-        })
-        .catch(err => {
-          alert("Could not load items. Make sure your script is deployed as Web App and shared publicly.");
-          console.error(err);
-        });
+    async function loadItems(sheetName) {
+      try {
+        const res = await fetch(`${API_URL}?sheet=${sheetName}`);
+        const data = await res.json();
+        allData = data;
+        populateSKUSelect(data);
+        displayCards(data);
+      } catch (err) {
+        console.error("Error loading items:", err);
+        document.getElementById("resultMessage").textContent = "Could not load items.";
+      }
     }
 
-    function populateSelected() {
+    function populateSKUSelect(data) {
+      const skuSelect = document.getElementById("skuSelect");
+      skuSelect.innerHTML = '';
+      data.forEach(item => {
+        const opt = document.createElement("option");
+        opt.value = item.SKU;
+        opt.textContent = `${item.SKU} - ${item.Brand}`;
+        skuSelect.appendChild(opt);
+      });
+      skuSelect.addEventListener("change", updatePreview);
+      updatePreview();
+    }
+
+    function updatePreview() {
       const sku = document.getElementById("skuSelect").value;
-      const selected = allData.find(item => item.SKU === sku);
-      if (!selected) return;
+      const item = allData.find(d => d.SKU === sku);
+      const preview = document.getElementById("previewImageContainer");
+      if (item && item.Image) {
+        preview.innerHTML = `<img id="previewImage" src="${item.Image}" alt="Preview">`;
+      } else {
+        preview.innerHTML = "";
+      }
 
-      document.getElementById("emailInput").value = selected.Email || "";
-      document.getElementById("urlInput").value = selected.Url || "";
-
-      const imageDiv = document.getElementById("selectedImage");
-      imageDiv.innerHTML = selected.Image
-        ? `<img src="${selected.Image}" alt="Selected Image">`
-        : "No image found.";
-
-      document.getElementById("cardContainer").innerHTML = `
-        <strong>Brand:</strong> ${selected.Brand}<br>
-        <strong>Campaign:</strong> ${selected.Campaign}<br>
-        <strong>Start Date:</strong> ${selected["Start Date"]}<br>
-        <strong>Expiry Date:</strong> ${selected["Expiry Date"]}<br>
-        <strong>Contract End Date:</strong> ${selected["Contract End Date"]}<br>
-        <strong>Expiry Status:</strong> ${selected["Expiry Status"]}<br>
-        <strong>Contract Status:</strong> ${selected["Contract Status"]}<br>
-        <strong>Status:</strong> ${selected.Status}
-      `;
+      document.getElementById("emailInput").value = item?.Email || "";
+      document.getElementById("urlInput").value = item?.Url || "";
     }
 
-    function submitForm() {
-      const sheet = document.getElementById("sheetSelect").value;
+    async function submitForm() {
+      const sheet = currentSheet;
       const sku = document.getElementById("skuSelect").value;
       const email = document.getElementById("emailInput").value;
       const url = document.getElementById("urlInput").value;
 
-      if (!sku || !email) {
-        alert("Please select an SKU and enter at least one email.");
-        return;
+      try {
+        const res = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sheet, sku, email, url })
+        });
+        const text = await res.text();
+        document.getElementById("resultMessage").textContent = text;
+        loadItems(sheet); // refresh
+      } catch (err) {
+        console.error("Submit failed:", err);
+        document.getElementById("resultMessage").textContent = "Error submitting.";
       }
+    }
 
-      fetch(scriptURL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sheet, sku, email, url })
-      })
-      .then(res => res.text())
-      .then(response => {
-        alert("Submitted successfully!");
-        loadItems();
-      })
-      .catch(err => {
-        alert("Error submitting: " + err);
-        console.error(err);
+    function displayCards(data) {
+      const container = document.getElementById("itemsContainer");
+      container.innerHTML = "";
+      data.forEach(item => {
+        const div = document.createElement("div");
+        div.className = "card";
+        div.innerHTML = `
+          <strong>Brand:</strong> ${item.Brand}<br>
+          <strong>SKU:</strong> ${item.SKU}<br>
+          <strong>Campaign:</strong> ${item.Campaign}<br>
+          <strong>Email:</strong> ${item.Email || "N/A"}<br>
+          <strong>URL:</strong> ${item.Url || "N/A"}<br>
+          ${item.Image ? `<img src="${item.Image}">` : ""}
+        `;
+        container.appendChild(div);
       });
     }
 
-    fetchSheets(); // Initialize on load
+    fetchSheets();
   </script>
 
 </body>
